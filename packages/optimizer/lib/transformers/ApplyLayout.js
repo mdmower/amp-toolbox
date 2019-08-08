@@ -27,7 +27,7 @@ const {
 } = require('../ParseLayout.js');
 
 const SUPPORTED_LAYOUTS = ['', 'nodisplay', 'fixed', 'fixed-height', 'responsive',
-  'container', 'fill', 'flex-item'];
+  'container', 'fill', 'flex-item', 'intrinsic'];
 
 function isSupportedLayout(layout) {
   return SUPPORTED_LAYOUTS.indexOf(layout) > -1;
@@ -61,6 +61,9 @@ function apply(layout, width, height, node) {
     case 'responsive':
       // Do nothing here, but emit <i-amphtml-sizer> later.
       break;
+    case 'intrinsic':
+      // Do nothing here, but emit <i-amphtml-sizer> later.
+      // break;
     case 'fill':
     case 'container':
       // Do nothing here.
@@ -85,18 +88,46 @@ function apply(layout, width, height, node) {
 
   node.attribs['i-amphtml-layout'] = layout;
 }
-
 function maybeAddSizerInto(node, tree, layout, width, height) {
-  if (layout !== 'responsive' || !width.isSet || width.numeral === 0 ||
+  if (!width.isSet || width.numeral === 0 ||
      !height.isSet || width.unit !== height.unit) {
     return;
   }
-
-  const padding = height.numeral / width.numeral * 100;
-  const sizer = tree.createElement('i-amphtml-sizer');
-  sizer.attribs.style = `display:block;padding-top:${padding.toFixed(4)}%;`;
+  let sizer = null;
+  if (layout === 'responsive') {
+    sizer = createResponsiveSizer(tree, width, height);
+  }
+  if (layout === 'intrinsic') {
+    sizer = createIntrinsicSizer(tree, width, height);
+  }
   const referenceNode = node.children && node.children.length ? node.children[0] : null;
   node.insertBefore(sizer, referenceNode);
+}
+
+function createResponsiveSizer(tree, width, height) {
+  const padding = height.numeral / width.numeral * 100;
+  const sizer = tree.createElement('i-amphtml-sizer', {
+    style: `display:block;padding-top:${padding.toFixed(4)}%;`,
+  });
+  return sizer;
+}
+
+function createIntrinsicSizer(tree, width, height) {
+  // Intrinsic uses an svg inside the sizer element rather than the padding
+  // trick Note a naked svg won't work because other things expect the
+  // i-amphtml-sizer element
+  const sizer = tree.createElement('i-amphtml-sizer', {
+    'class': 'i-amphtml-sizer',
+  });
+  const sizerImg = tree.createElement('img', {
+    'alt': '',
+    'aria-hidden': 'true',
+    'class': 'i-amphtml-intrinsic-sizer',
+    'role': 'presentation',
+    'src': `data:image/svg+xml;charset=utf-8,<svg height="${height.numeral}" width="${width.numeral}" xmlns="http://www.w3.org/2000/svg" version="1.1"/>`,
+  });
+  sizer.appendChild(sizerImg);
+  return sizer;
 }
 
 module.exports = {
