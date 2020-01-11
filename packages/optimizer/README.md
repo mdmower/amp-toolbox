@@ -187,46 +187,43 @@ const optimizer = AmpOptimizer.create({
 
 ### Self-hosted AMP components
 
-It's possible to rewrite the AMP framework and component imports to a different domain than `cdn.ampproject.org`. These options tailor URL rewriting performed by `ampOptimizer.transformHtml`:
+It's possible to rewrite the AMP framework and component imports to a different domain than `cdn.ampproject.org`. It is expected that the domain follow the same path conventions used by `cdn.ampproject.org`. Namely, specific runtime versions should be available under path `rtv/{version}`. For example, if runtime version `011234567890123` is hosted at `example.org/amp/`, then it should also be available from `example.org/amp/rtv/011234567890123/`.
+
+These options tailor URL rewriting performed by `ampOptimizer.transformHtml`:
 
 - `ampUrlPrefix`: Replace `https://cdn.ampproject.org/` with another origin or relative path.
 
-  **Notice:** The behavior of `ampUrlPrefix` when used in conjunction with `ampRuntimeVersion` changed beginning with version 1.1.2. Prior to 1.1.2, `rtv/{rtv}/` was automatically appended to `ampUrlPrefix` when `ampRuntimeVersion` was specified. Since version 1.1.2, `ampUrlPrefix` is not modified when `ampRuntimeVersion` is also specified.
-
-- `rewriteDynamicComponents`: When used in conjunction with `ampUrlPrefix`, this option can be set to `false` to prevent [dynamic AMP components](https://github.com/ampproject/amphtml/blob/master/spec/amp-cache-guidelines.md#guidelines-adding-a-new-cache-to-the-amp-ecosystem) from having their URLs rewritten.
+- `rewriteCacheModifiedExtensions`: When used in conjunction with `ampUrlPrefix`, this option can be set to `false` to prevent [cache modified extensions](https://github.com/ampproject/amphtml/blob/master/spec/amp-cache-guidelines.md#guidelines-adding-a-new-cache-to-the-amp-ecosystem) from having their URLs rewritten.
 
 Examples:
+
+Note: `amp-geo` is a [cache modified extension](https://github.com/ampproject/amphtml/blob/master/spec/amp-cache-guidelines.md#guidelines-adding-a-new-cache-to-the-amp-ecosystem).
+
 ```
 const ampOptimizer = require('@ampproject/toolbox-optimizer');
 
-// The input string
 const originalHtml = `
 <!doctype html>
 <html ⚡>
+<head>
+  <script async src="https://cdn.ampproject.org/v0.js"></script>
+  <script async custom-element="amp-geo" src="https://cdn.ampproject.org/v0/amp-geo-0.1.js"></script>
 ...
 `
 
-// this will rewrite https://cdn.ampproject.org/v0.js to /amp/v0.js and will
-// rewrite dynamic component https://cdn.ampproject.org/v0/amp-geo-0.1.js to
-// /amp/v0/amp-geo-0.1.js
-const optimizedHtmlA = await ampOptimizer.transformHtml(originalHtml, {
+const optimizedHtmlSimple = await ampOptimizer.transformHtml(originalHtml, {
   ampUrlPrefix: '/amp'
 });
+// Output:
+// <script async src="/amp/v0.js"></script>
+// <script async custom-element="amp-geo" src="/amp/v0/amp-geo-0.1.js"></script>
 
-// this will rewrite https://cdn.ampproject.org/v0.js to /amp/v0.js and will
-// not rewrite dynamic component https://cdn.ampproject.org/v0/amp-geo-0.1.js
-const optimizedHtmlB = await ampOptimizer.transformHtml(originalHtml, {
+const optimizedHtmlVersioned = await ampOptimizer.transformHtml(originalHtml, {
   ampUrlPrefix: '/amp',
-  rewriteDynamicComponents: false
-});
-
-// this will rewrite https://cdn.ampproject.org/v0.js to
-// /amp/001515617716922/v0.js and will rewrite dynamic component
-// https://cdn.ampproject.org/v0/amp-geo-0.1.js to
-// https://cdn.ampproject.org/v0/rtv/001515617716922/amp-geo-0.1.js
-const optimizedHtmlC = await ampOptimizer.transformHtml(originalHtml, {
   ampRuntimeVersion: '001515617716922',
-  ampUrlPrefix: '/amp/001515617716922',
-  rewriteDynamicComponents: false
+  rewriteCacheModifiedExtensions: false
 });
+// Output:
+// <script async src="/amp/rtv/001515617716922/v0.js"></script>
+// <script async custom-element="amp-geo" src="https://cdn.ampproject.org/v0/rtv/001515617716922/amp-geo-0.1.js"></script>
 ```

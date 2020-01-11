@@ -17,7 +17,7 @@
 
 const {
   AMP_CACHE_HOST,
-  AMP_DYNAMIC_COMPONENTS,
+  CACHE_MODIFIED_EXTENSIONS,
   appendRuntimeVersion,
 } = require('../AmpConstants.js');
 const {findMetaViewport} = require('../HtmlDomHelper');
@@ -39,8 +39,8 @@ const {findMetaViewport} = require('../HtmlDomHelper');
  *   URLs being re-written from `https://cdn.ampproject.org/v0.js` to
  *   `/amp/v0.js`. This option is experimental and not recommended.
  *
- * * `rewriteDynamicComponents`: optionally disable rewriting of
- *   [dynamically generated components](https://github.com/ampproject/amphtml/blob/master/spec/amp-cache-guidelines.md#guidelines-adding-a-new-cache-to-the-amp-ecosystem).
+ * * `rewriteCacheModifiedExtensions`: optionally disable rewriting of
+ *   [cache modified extensions](https://github.com/ampproject/amphtml/blob/master/spec/amp-cache-guidelines.md#guidelines-adding-a-new-cache-to-the-amp-ecosystem).
  *   For example: `https://cdn.ampproject.org/v0/amp-geo-0.1.js` returns
  *   different content depending on the country from which the request was made.
  *
@@ -58,15 +58,11 @@ class RewriteAmpUrls {
     if (!head) return;
 
     let ampUrlPrefix = params.ampUrlPrefix || AMP_CACHE_HOST;
-    if (params.ampRuntimeVersion && !params.ampUrlPrefix) {
+    let cmeAmpUrlPrefix =
+      params.rewriteCacheModifiedExtensions === false ? AMP_CACHE_HOST : ampUrlPrefix;
+    if (params.ampRuntimeVersion) {
       ampUrlPrefix = appendRuntimeVersion(ampUrlPrefix, params.ampRuntimeVersion);
-    }
-    let dynamicAmpUrlPrefix = ampUrlPrefix;
-    if (params.rewriteDynamicComponents === false) {
-      dynamicAmpUrlPrefix = AMP_CACHE_HOST;
-      if (params.ampRuntimeVersion) {
-        dynamicAmpUrlPrefix = appendRuntimeVersion(dynamicAmpUrlPrefix, params.ampRuntimeVersion);
-      }
+      cmeAmpUrlPrefix = appendRuntimeVersion(cmeAmpUrlPrefix, params.ampRuntimeVersion);
     }
 
     let node = head.firstChild;
@@ -74,9 +70,8 @@ class RewriteAmpUrls {
 
     while (node) {
       if (node.tagName === 'script' && this._usesAmpCacheUrl(node.attribs.src)) {
-        const isDynamicComponent = this._isDynamicComponent(node);
         node.attribs.src = this._replaceUrl(node.attribs.src,
-          isDynamicComponent ? dynamicAmpUrlPrefix : ampUrlPrefix);
+          this._isCacheModifiedExtension(node) ? cmeAmpUrlPrefix : ampUrlPrefix);
         referenceNode = this._addPreload(tree, head, referenceNode, node.attribs.src, 'script');
       } else if (node.tagName === 'link' &&
                   node.attribs.rel === 'stylesheet' &&
@@ -113,14 +108,12 @@ class RewriteAmpUrls {
     return preload;
   }
 
-  _isDynamicComponent(script) {
-    if (!script || !script.attribs || script.tagName !== 'script') {
+  _isCacheModifiedExtension(script) {
+    if (!script.attribs['custom-element']) {
       return false;
     }
 
-    return Object.keys(AMP_DYNAMIC_COMPONENTS).some((type) => {
-      return script.attribs[type] && AMP_DYNAMIC_COMPONENTS[type].includes(script.attribs[type]);
-    });
+    return CACHE_MODIFIED_EXTENSIONS.includes(script.attribs['custom-element']);
   }
 }
 
