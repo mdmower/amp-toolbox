@@ -17,8 +17,7 @@
 
 const {AMP_CACHE_HOST, appendRuntimeVersion} = require('../AmpConstants.js');
 
-const V0_CSS = 'v0.css';
-const V0_CSS_URL = AMP_CACHE_HOST + '/' + V0_CSS;
+const V0_CSS_PATH = '/v0.css';
 
 /**
  * AmpBoilerplateTransformer - This DOM transformer adds
@@ -62,7 +61,7 @@ class AmpBoilerplateTransformer {
   async _addStaticCss(tree, node, params) {
     // we can always inline v0.css as the AMP runtime will take care of keeping v0.css in sync
     try {
-      return this._inlineCss(node, params.ampRuntimeVersion);
+      return this._inlineCss(node, params);
     } catch (error) {
       this.log_.error(error);
       this._linkCss(tree, node);
@@ -73,21 +72,42 @@ class AmpBoilerplateTransformer {
     const cssStyleNode = tree.createElement('link');
     cssStyleNode.attribs = {
       rel: 'stylesheet',
-      href: V0_CSS_URL,
+      href: AMP_CACHE_HOST + V0_CSS_PATH,
     };
     node.parent.insertBefore(cssStyleNode, node);
   }
 
-  async _inlineCss(node, version) {
+  async _inlineCss(node, params) {
+    let version = params.ampRuntimeVersion;
+    const ampUrlPrefix = params.ampUrlPrefix;
+
     // use version passed in via params if available
     // otherwise fetch the current prod version
-    let v0CssUrl;
-    if (version) {
-      v0CssUrl = appendRuntimeVersion(AMP_CACHE_HOST, version) + '/' + V0_CSS;
+    let v0CssUrl = AMP_CACHE_HOST + V0_CSS_PATH;
+    if (!ampUrlPrefix) {
+      if (version) {
+        v0CssUrl = appendRuntimeVersion(AMP_CACHE_HOST, version) + V0_CSS_PATH;
+      } else {
+        version = await this.runtimeVersion_.currentVersion();
+      }
     } else {
-      v0CssUrl = V0_CSS_URL;
-      version = await this.runtimeVersion_.currentVersion();
+      // TODO: If ampUrlPrefix is a relative URL, this will fall back to
+      // fetching the latest runtime version and boilerplate CSS from
+      // cdn.ampproject.org. Is this our best option?
+      if (version) {
+        const customCssUrl = appendRuntimeVersion(ampUrlPrefix, version) + V0_CSS_PATH;
+        if (this._isAbsoluteUrl(customCssUrl)) {
+          v0CssUrl = customCssUrl;
+        }
+      } else {
+        version = await this.runtimeVersion_.currentVersion({ampUrlPrefix});
+        const customCssUrl = ampUrlPrefix + V0_CSS_PATH;
+        if (this._isAbsoluteUrl(customCssUrl)) {
+          v0CssUrl = customCssUrl;
+        }
+      }
     }
+
     node.attribs['i-amphtml-version'] = version;
 
     // Fetch and inline contents of v0.css
@@ -98,6 +118,15 @@ class AmpBoilerplateTransformer {
     }
     const body = await response.text();
     node.insertText(body);
+  }
+
+  _isAbsoluteUrl(url) {
+    try {
+      new URL(url);
+      return true;
+    } catch (ex) { }
+
+    return false;
   }
 }
 
