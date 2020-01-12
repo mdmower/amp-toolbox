@@ -81,6 +81,15 @@ class RewriteAmpUrls {
       }
       node = node.nextSibling;
     }
+
+    if (params.ampUrlPrefix && params.ampUrlPrefix !== AMP_CACHE_HOST) {
+      referenceNode = this._addMeta(tree, head, referenceNode,
+          'amp-config-urls-cdn', params.ampUrlPrefix);
+    }
+    if (params.rewriteCacheModifiedExtensions === false) {
+      referenceNode = this._addMeta(tree, head, referenceNode,
+          'amp-config-urls-cdnSupportsCacheModifiedExtensions', 'false');
+    }
   }
 
   _usesAmpCacheUrl(url) {
@@ -106,6 +115,12 @@ class RewriteAmpUrls {
     });
     parent.insertAfter(preload, node);
     return preload;
+  }
+
+  _addMeta(tree, parent, node, name, content) {
+    const meta = tree.createElement('meta', {name, content});
+    parent.insertAfter(meta, node);
+    return meta;
   }
 
   _isCacheModifiedExtension(script) {
