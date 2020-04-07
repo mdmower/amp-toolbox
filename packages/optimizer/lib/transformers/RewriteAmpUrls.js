@@ -33,19 +33,18 @@ const {calculateHost} = require('../RuntimeHostHelper');
  *   `https://cdn.ampproject.org/rtv/001515617716922/v0.js`.
  *
  * * `ampUrlPrefix`: specifies an URL prefix for AMP runtime
- *   URLs. For example: `ampUrlPrefix: "/amp"` will result in AMP runtime
- *   URLs being re-written from `https://cdn.ampproject.org/v0.js` to
- *   `/amp/v0.js`. This option is experimental and not recommended.
+ *   URLs. For example: `ampUrlPrefix: "https://example.com/amp"` will result
+ *   in AMP runtime URLs being re-written from
+ *   `https://cdn.ampproject.org/v0.js` to `https://example.com/amp/v0.js`.
+ *   This option is experimental and not recommended.
  *
  * * `geoApiUrl`: specifies amp-geo API URL to use as a fallback when
  *   amp-geo-0.1.js is served unpatched, i.e. when
- *   {{AMP_ISO_COUNTRY_HOTPATCH}} is not replaced dynamically.
+ *   {{AMP_ISO_COUNTRY_HOTPATCH}} is not replaced dynamically. This option is
+ *   only useful when paired with `ampUrlPrefix`.`
  *
  * * `lts`: Use long-term stable URLs. This option is not compatible with
- *   `ampRuntimeVersion` or `ampUrlPrefix`; an error will be thrown if
- *   these options are included together. Similarly, the `geoApiUrl`
- *   option is ineffective with the lts flag, but will simply be ignored
- *   rather than throwing an error.
+ *   `ampRuntimeVersion`.
  *
  * All parameters are optional. If no option is provided, runtime URLs won't be
  * re-written. You can combine `ampRuntimeVersion` and  `ampUrlPrefix` to
@@ -61,6 +60,9 @@ class RewriteAmpUrls {
     if (!head) return;
 
     const host = calculateHost(params);
+    if (!this._isAbsoluteUrl(host)) {
+      throw new Error('Host must be an absolute URL');
+    }
 
     let node = head.firstChild;
     let referenceNode = findMetaViewport(head);
@@ -86,6 +88,9 @@ class RewriteAmpUrls {
       this._addMeta(head, 'runtime-host', versionlessHost);
     }
     if (params.geoApiUrl && !params.lts) {
+      if (!this._isAbsoluteUrl(params.geoApiUrl)) {
+        throw new Error('amp-geo API must be an absolute URL');
+      }
       this._addMeta(head, 'amp-geo-api', params.geoApiUrl);
     }
   }
@@ -117,6 +122,15 @@ class RewriteAmpUrls {
   _addMeta(head, name, content) {
     const meta = createElement('meta', {name, content});
     insertBefore(head, meta, firstChildByTag(head, 'script'));
+  }
+
+  _isAbsoluteUrl(url) {
+    try {
+      new URL(url);
+      return true;
+    } catch (ex) {}
+
+    return false;
   }
 }
 

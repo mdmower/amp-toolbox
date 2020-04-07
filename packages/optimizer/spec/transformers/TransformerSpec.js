@@ -35,16 +35,27 @@ function loadTestConfigs(subDir) {
 
     const fetch = fetchMock
       .sandbox()
-      .mock('https://cdn.ampproject.org/rtv/metadata', '{"ampRuntimeVersion":"012345678900000"}')
-      .mock('https://cdn.ampproject.org/v0.css', '/* v0.css */')
-      .mock('https://cdn.ampproject.org/rtv/001515617716922/v0.css', '/* v0.css */');
+      .catch(404)
+      .mock('https://cdn.ampproject.org/rtv/001515617716922/v0.css', '/* v0-specific-rtv.css */')
+      .mock('https://cdn.ampproject.org/rtv/012345678900000/v0.css', '/* v0-prod.css */')
+      .mock('https://cdn.ampproject.org/rtv/012345678911111/v0.css', '/* v0-lts.css */')
+      .mock('https://example.com/amp/rtv/012345678922222/v0.css', '/* v0-custom-host.css */');
     const Transformer = require(join('../../lib/transformers', transformerName + '.js'));
     const config = {
       validatorRules,
       fetch,
       log,
       runtimeVersion: {
-        currentVersion: () => Promise.resolve('012345678900000'),
+        currentVersion: async (params) => {
+          if (params.ampUrlPrefix && params.lts) {
+            return;
+          } else if (params.ampUrlPrefix) {
+            return '012345678922222';
+          } else if (params.lts) {
+            return '012345678911111';
+          }
+          return '012345678900000';
+        },
       },
     };
     try {

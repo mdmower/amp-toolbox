@@ -330,8 +330,9 @@ const originalHtml = `
 // Additional options can be passed as the second argument
 const optimizedHtml = await ampOptimizer.transformHtml(originalHtml, {
   ampUrl: 'canonical.amp.html',
-  // this will rewrite https://cdn.ampproject.org/v0.js to /amp/v0.js
-  ampUrlPrefix: '/amp'
+  // this will rewrite https://cdn.ampproject.org/v0.js to
+  // https://example.com/amp/v0.js, and similarly for components
+  ampUrlPrefix: 'https://example.com/amp'
 });
 
 console.log(optimizedHtml);
